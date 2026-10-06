@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cartoon Factory — Transforme tes images en cartoons animés</title>
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    :root {
+        --bg: #fff8f0; --panel: #ffffff; --panel-2: #fff1e0; --border: #f0d9c0;
+        --ink: #2a1a0a; --ink-dim: #8a6a4a; --ink-faint: #c0a080;
+        --success: #2d8a4e; --error: #c0392b; --warn: #d4a017; --info: #e86a1a;
+        --radius: 14px;
+    }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        background: var(--bg); color: var(--ink); min-height: 100vh;
+        padding: 1.2rem 1rem 6rem; font-size: 15px; line-height: 1.5;
+        max-width: 900px; margin: 0 auto;
+    }
+    header { margin-bottom: 1.2rem; text-align: center; }
+    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0.2rem; }
+    h1 span { color: var(--info); }
+    .subtitle { font-size: 0.8rem; color: var(--ink-dim); font-style: italic; }
+
+    .toast {
+        position: fixed; top: 1.5rem; left: 50%;
+        transform: translateX(-50%) translateY(-100px);
+        background: var(--ink); color: #fff;
+        padding: 0.85rem 1.4rem; border-radius: 10px;
+        font-size: 0.85rem; font-weight: 500;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        z-index: 1000; opacity: 0;
+        transition: transform 0.35s ease, opacity 0.35s ease;
+        max-width: 90vw; text-align: center;
+        display: flex; align-items: center; gap: 0.5rem;
+    }
+    .toast.visible { transform: translateX(-50%) translateY(0); opacity: 1; }
+    .toast.success { background: var(--success); }
+    .toast.error { background: var(--error); }
+    .toast.warn { background: var(--warn); }
+
+    .info-banner {
+        background: #fff1e0; border-left: 4px solid var(--info);
+        padding: 0.85rem 1rem; border-radius: 10px;
+        font-size: 0.8rem; color: #5a3a1a;
+        margin-bottom: 1rem; line-height: 1.5;
+    }
+    .info-banner strong { color: var(--ink); }
+
+    .api-panel {
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 1rem 1.1rem;
+        margin-bottom: 1rem;
+    }
+    .api-panel.ok { border-color: var(--success); }
+    .api-key-input {
+        width: 100%; padding: 0.85rem 1rem;
+        border-radius: 8px; border: 1px solid var(--border);
+        background: #fdfaf6; color: var(--ink);
+        font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+        font-size: 0.85rem; margin-bottom: 0.6rem;
+    }
+    .api-key-input:focus { outline: none; border-color: var(--info); }
+    .api-save-btn {
+        width: 100%; padding: 0.8rem 1.2rem;
+        border-radius: 8px; border: none;
+        background: var(--info); color: #fff;
+        font-size: 0.9rem; font-weight: 600; font-family: inherit;
+        cursor: pointer; transition: opacity 0.2s;
+        margin-bottom: 0.6rem;
+    }
+    .api-save-btn:active { transform: scale(0.98); }
+    .api-status-line {
+        font-size: 0.75rem; padding: 0.55rem 0.85rem;
+        border-radius: 6px; margin-bottom: 0.5rem;
+        display: flex; align-items: center; gap: 0.5rem;
+        background: var(--panel-2); color: var(--ink-dim);
+    }
+    .api-status-line.ok { background: #e3f5e9; color: var(--success); font-weight: 600; }
+    .api-status-line .status-dot {
+        width: 8px; height: 8px; border-radius: 50%;
+        background: var(--ink-faint);
+    }
+    .api-status-line.ok .status-dot { background: var(--success); }
+    .api-hint { font-size: 0.72rem; color: var(--ink-dim); margin-top: 0.4rem; }
+    .api-hint a { color: var(--info); text-decoration: underline; }
+    .stat-line {
+        font-size: 0.72rem; color: var(--ink-dim); margin-top: 0.5rem;
+        padding: 0.4rem 0.6rem; background: var(--panel-2); border-radius: 6px;
+        display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.3rem;
+    }
+    .wake-status {
+        font-size: 0.72rem; padding: 0.5rem 0.7rem;
+        border-radius: 6px; margin-top: 0.4rem;
+        display: flex; justify-content: space-between; align-items: center;
+        background: #eef4ff; color: var(--info);
+        flex-wrap: wrap; gap: 0.4rem;
+    }
+    .wake-status.active { background: #e3f5e9; color: var(--success); }
+    .wake-status button {
+        background: transparent; border: 1px solid currentColor;
+        color: inherit; padding: 0.25rem 0.6rem; border-radius: 6px;
+        font-size: 0.68rem; cursor: pointer; font-family: inherit;
+    }
+
+    .upload-zone {
+        border: 2px dashed var(--border); border-radius: var(--radius);
+        padding: 2rem 1rem; text-align: center; cursor: pointer;
+        transition: all 0.2s; margin-bottom: 1rem;
+        background: var(--panel);
+    }
+    .upload-zone:hover { border-color: var(--info); background: #fff1e0; }
+    .upload-zone.loading { pointer-events: none; opacity: 0.6; }
+    .upload-zone input[type="file"] { display: none; }
+    .upload-icon { font-size: 2.2rem; margin-bottom: 0.6rem; color: var(--info); }
+    .upload-text { font-size: 0.95rem; color: var(--ink); margin-bottom: 0.2rem; font-weight: 600; }
+    .upload-hint { font-size: 0.75rem; color: var(--ink-dim); }
+
+    .images-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+        gap: 0.5rem; margin-bottom: 1rem;
+    }
+    .image-card {
+        position: relative; border-radius: 8px; overflow: hidden;
+        border: 2px solid var(--border); background: #f0f0f0;
+        aspect-ratio: 9/16;
+    }
+    .image-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .image-card .remove-btn {
+        position: absolute; top: 4px; right: 4px;
+        background: rgba(0,0,0,0.7); color: #fff; border: none;
+        width: 22px; height: 22px; border-radius: 50%; font-size: 11px;
+        cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+
+    .section {
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: var(--radius); margin-bottom: 1rem;
+        overflow: hidden;
+    }
+    .section-header {
+        padding: 0.9rem 1.1rem; cursor: pointer; user-select: none;
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .section-header:hover { background: var(--panel-2); }
+    .section-title {
+        font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em;
+        color: var(--ink-dim); font-weight: 700;
+    }
+    .section-title .badge {
+        display: inline-block; margin-left: 0.4rem; padding: 0.1rem 0.4rem;
+        background: var(--info); color: #fff; border-radius: 10px;
+        font-size: 0.65rem; letter-spacing: 0;
+    }
+    .section-header .chevron {
+        font-size: 0.7rem; color: var(--ink-faint); transition: transform 0.2s;
+    }
+    .section.open .section-header .chevron { transform: rotate(180deg); }
+    .section-body { max-height: 0; overflow: hidden; transition: max-height 0.35s ease; }
+    .section.open .section-body { max-height: 5000px; }
+    .section-content { padding: 0 1.1rem 1.1rem; }
+
+    .prompt-main {
+        width: 100%; padding: 0.85rem 1rem;
+        border-radius: 8px; border: 1px solid var(--border);
+        background: #fdfaf6; color: var(--ink);
+        font-family: inherit; font-size: 0.9rem;
+        min-height: 100px; resize: vertical; line-height: 1.5;
+    }
+    .prompt-main:focus { outline: none; border-color: var(--info); }
+    .prompt-main-hint {
+        font-size: 0.72rem; color: var(--ink-dim);
+        margin-top: 0.5rem; line-height: 1.4;
+    }
+
+    .styles-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 0.5rem;
+    }
+    .style-card {
+        padding: 0.75rem 0.85rem; border-radius: 10px;
+        border: 2px solid var(--border); background: var(--panel-2);
+        cursor: pointer; transition: all 0.15s;
+        display: flex; align-items: center; gap: 0.55rem;
+    }
+    .style-card:hover { transform: translateY(-1px); }
+    .style-card.selected {
+        background: var(--info); color: #fff;
+        border-color: var(--info);
+        box-shadow: 0 4px 12px rgba(232,106,26,0.3);
+    }
+    .style-card .style-emoji { font-size: 1.3rem; flex-shrink: 0; }
+    .style-card .style-name { font-size: 0.82rem; font-weight: 700; line-height: 1.2; }
+    .style-card .style-desc { font-size: 0.65rem; opacity: 0.7; margin-top: 0.1rem; line-height: 1.2; }
+
+    .style-category-header {
+        grid-column: 1 / -1;
+        font-size: 0.72rem; font-weight: 700;
+        color: var(--info); text-transform: uppercase;
+        letter-spacing: 0.1em;
+        padding: 0.7rem 0 0.3rem;
+        border-bottom: 2px solid var(--info);
+        margin-bottom: 0.4rem;
+    }
+    .style-category-header:first-child { padding-top: 0; }
+
+    .control-row { margin-bottom: 0.9rem; }
+    .control-label {
+        display: block; font-size: 0.72rem; color: var(--ink-dim);
+        margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.06em;
+        font-weight: 700;
+    }
+    select {
+        width: 100%; padding: 0.7rem 0.9rem; border-radius: 8px;
+        border: 1px solid var(--border); background: #fdfaf6;
+        color: var(--ink); font-family: inherit; font-size: 0.88rem;
+    }
+    select:focus { outline: none; border-color: var(--info); }
+
+    .btn-primary {
+        width: 100%; padding: 1.1rem; border-radius: var(--radius);
+        border: none; background: var(--info); color: #fff;
+        font-size: 1rem; font-weight: 700; font-family: inherit;
+        cursor: pointer; margin-bottom: 1rem;
+        box-shadow: 0 4px 16px rgba(232,106,26,0.35);
+    }
+    .btn-primary:active:not(:disabled) { transform: scale(0.98); }
+    .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; box-shadow: none; }
+
+    .btn-stop {
+        width: 100%; padding: 0.8rem; border-radius: var(--radius);
+        border: 1px solid var(--border); background: var(--panel);
+        color: var(--error); font-size: 0.85rem; font-weight: 700;
+        font-family: inherit; cursor: pointer; margin-bottom: 1rem;
+        display: none;
+    }
+    .btn-stop.visible { display: block; }
+
+    .queue { margin-top: 1rem; }
+    .queue-summary {
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 8px; padding: 0.7rem 0.9rem; margin-bottom: 0.6rem;
+        font-size: 0.78rem; display: flex; justify-content: space-between;
+        align-items: center; flex-wrap: wrap; gap: 0.4rem;
+    }
+    .queue-summary .progress-text { color: var(--info); font-weight: 700; }
+    .queue-item {
+        display: flex; align-items: center; gap: 0.8rem;
+        padding: 0.7rem 0.8rem; border-radius: 8px;
+        border: 1px solid var(--border); margin-bottom: 0.4rem;
+        background: var(--panel); font-size: 0.82rem;
+    }
+    .queue-item.pending { opacity: 0.5; }
+    .queue-item.creating { border-color: var(--warn); }
+    .queue-item.processing { border-color: var(--info); }
+    .queue-item.done { border-color: var(--success); }
+    .queue-item.failed { border-color: var(--error); }
+    .queue-item .q-icon { font-size: 1rem; width: 1.5rem; text-align: center; }
+    .queue-item .q-name { flex: 1; font-weight: 600; }
+    .queue-item .q-status { font-size: 0.72rem; color: var(--ink-dim); text-align: right; }
+
+    .gallery { margin-top: 1.5rem; }
+    .gallery-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 0.8rem;
+    }
+    .gallery-item {
+        border-radius: var(--radius); overflow: hidden;
+        border: 2px solid var(--border); background: #000;
+        animation: fadeIn 0.4s ease;
+    }
+    .gallery-item video { width: 100%; display: block; aspect-ratio: 9/16; object-fit: cover; }
+    .gallery-item .g-caption {
+        padding: 0.4rem 0.6rem; background: var(--panel);
+        font-size: 0.7rem; color: var(--ink-dim); font-weight: 600;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .status-bar {
+        position: fixed; bottom: 0; left: 0; right: 0;
+        background: var(--ink); color: #fff; padding: 0.7rem 1rem;
+        font-size: 0.78rem; display: flex; align-items: center; gap: 0.6rem;
+        transform: translateY(100%); transition: transform 0.3s;
+        z-index: 100;
+    }
+    .status-bar.visible { transform: translateY(0); }
+    .status-bar .spinner {
+        width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.3);
+        border-top-color: #fff; border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+    <h1>🎨 Cartoon <span>Factory</span></h1>
+    <p class="subtitle">Transforme tes images en cartoons animés</p>
+</header>
+
+<div class="info-banner">
+    <strong>Comment ça marche :</strong> Ajoute tes photos, choisis un style cartoon,
+    règle l’intensité, et l’IA transforme chaque image en vidéo animée dans le style choisi.
+    Format <strong>portrait 9:16</strong>.
+</div>
+
+<div class="api-panel" id="api-panel">
+    <input type="password" class="api-key-input" id="api-key-input"
+           placeholder="Collez votre clé API ici (sk-...)" autocomplete="off" spellcheck="false">
+    <button type="button" class="api-save-btn" id="api-save-btn">Enregistrer la clé</button>
+    <div class="api-status-line" id="api-status-line">
+        <span class="status-dot"></span>
+        <span id="api-status-text">Aucune clé API enregistrée</span>
+    </div>
+    <div class="api-hint">
+        Clé gratuite sur <a href="https://platform.agnes-ai.com" target="_blank">platform.agnes-ai.com</a>
+    </div>
+    <div class="stat-line">
+        <span>📊 Vitesse : <span id="stat-speed">en attente</span></span>
+        <span id="stat-samples">0 génération</span>
+    </div>
+    <div class="wake-status" id="wake-status">
+        <span id="wake-status-text">💤 Veille automatique</span>
+        <button type="button" id="wake-toggle-btn">Garder l'écran allumé</button>
+    </div>
+</div>
+
+<div class="upload-zone" id="upload-zone">
+    <input type="file" id="file-input" accept="image/*" multiple>
+    <div class="upload-icon">＋</div>
+    <div class="upload-text">Ajoutez vos images</div>
+    <div class="upload-hint">Autant que vous voulez — chacune deviendra un cartoon animé</div>
+</div>
+
+<div class="images-grid" id="images-grid"></div>
+
+<div class="section open" id="section-style">
+    <div class="section-header" data-toggle="section-style">
+        <span class="section-title">🎨 Style cartoon <span class="badge">requis</span></span>
+        <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+        <div class="section-content">
+            <div class="styles-grid" id="styles-grid"></div>
+        </div>
+    </div>
+</div>
+
+<div class="section open" id="section-prompt">
+    <div class="section-header" data-toggle="section-prompt">
+        <span class="section-title">✍️ Détails supplémentaires <span class="badge">optionnel</span></span>
+        <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+        <div class="section-content">
+            <textarea class="prompt-main" id="main-prompt"
+                placeholder="Détails en plus du style : ambiance, couleurs, accessoires… Ex : « Ajoute un chapeau rouge, fond ciel bleu, ambiance joyeuse. »"></textarea>
+            <div class="prompt-main-hint">
+                💡 Ces détails viennent <strong>en plus</strong> du style cartoon sélectionné.
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="section open" id="section-tech">
+    <div class="section-header" data-toggle="section-tech">
+        <span class="section-title">⚙️ Réglages techniques</span>
+        <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+        <div class="section-content">
+            <div class="control-row">
+                <label class="control-label">Durée de chaque vidéo</label>
+                <select id="duration-select">
+                    <option value="121">5 secondes</option>
+                    <option value="153" selected>6,4 secondes (recommandé)</option>
+                    <option value="241">10 secondes</option>
+                </select>
+            </div>
+            <div class="control-row">
+                <label class="control-label">Intensité de transformation</label>
+                <select id="intensity-select">
+                    <option value="subtle">Légère — ressemble encore à la photo</option>
+                    <option value="moderate" selected>Moyenne — cartoon équilibré</option>
+                    <option value="radical">Radicale — cartoon total</option>
+                </select>
+            </div>
+            <div class="control-row">
+                <label class="control-label">Mouvement</label>
+                <select id="motion-select">
+                    <option value="random">Aléatoire</option>
+                    <option value="subtle">Subtil</option>
+                    <option value="moderate" selected>Modéré</option>
+                    <option value="strong">Fort / exagéré cartoon</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<button type="button" class="btn-primary" id="generate-btn" disabled>
+    Créer les cartoons animés
+</button>
+
+<button type="button" class="btn-stop" id="stop-btn">
+    ⏹ Arrêter la génération
+</button>
+
+<div class="queue" id="queue" style="display:none;"></div>
+
+<div class="gallery" id="gallery" style="display:none;">
+    <div class="section-title" style="margin-bottom:0.8rem;">Cartoons générés</div>
+    <div class="gallery-grid" id="gallery-grid"></div>
+</div>
+
+<div class="status-bar" id="status-bar">
+    <div class="spinner"></div>
+    <span id="status-text">Préparation…</span>
+</div>
+
+<div class="toast" id="toast">
+    <span class="toast-icon" id="toast-icon">✓</span>
+    <span id="toast-text">Message</span>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// CONFIGURATION API
+// ══════════════════════════════════════════════════════════════════
+const API_BASE = 'https://apihub.agnes-ai.com/v1';
+const POLL_BASE = 'https://apihub.agnes-ai.com/agnesapi';
+const MODEL_VIDEO = 'agnes-video-v2.0';
+const FRAME_RATE = 24;
+
+let createIntervalMs = 62000;
+const CREATE_INTERVAL_MIN = 62000;
+const CREATE_INTERVAL_MAX = 90000;
+const CREATE_INTERVAL_SAFE = 75000;
+
+const POLL_INTERVAL_SEC = 8;
+const MAX_POLL_ATTEMPTS = 100;
+
+const TIMING_CACHE_KEY = 'cartoon_timing_cache_v1';
+const API_KEY_STORAGE = 'cartoon_api_key';
+const WAKE_LOCK_PREF = 'cartoon_wakelock';
+
+const MAX_VISIBLE_QUEUE = 30;
+const MAX_IMAGE_SIZE = 12 * 1024 * 1024;
+const THUMBNAIL_MAX_WIDTH = 200;
+
+// ══════════════════════════════════════════════════════════════════
+// STYLES CARTOON
+// ══════════════════════════════════════════════════════════════════
+const CARTOON_STYLES = [
+    // ── CLASSIQUES ──
+    { id: 'simpson', name: 'Les Simpson', emoji: '🍩', desc: 'Jaune, contours noirs', cat: 'Classiques',
+      prompt: 'The Simpsons cartoon style, yellow-skinned characters, thick black outlines, flat saturated colors, Matt Groening art style. Transform the entire image into this cartoon style.' },
+    { id: 'pixar', name: 'Pixar 3D', emoji: '✨', desc: '3D lumineux, expressif', cat: 'Classiques',
+      prompt: 'high-quality 3D computer animation, Pixar-style rendering, subsurface scattering, expressive big eyes, cinematic lighting, vibrant colors. Transform the entire image into this 3D animated style.' },
+    { id: 'disney', name: 'Disney / Conte', emoji: '🏰', desc: 'Magique, doux, féérique', cat: 'Classiques',
+      prompt: 'classic Disney fairy tale animation style, soft rounded shapes, magical sparkling light, pastel colors, storybook atmosphere. Transform the entire image into this Disney animated style.' },
+    { id: 'cartoon-network', name: 'Cartoon Network', emoji: '📺', desc: 'Angles, énergie, pop', cat: 'Classiques',
+      prompt: 'Cartoon Network animation style, angular character design, bold outlines, vibrant flat colors, dynamic poses. Transform the entire image into this Cartoon Network style.' },
+    { id: 'anime90', name: 'Anime 90s', emoji: '📼', desc: 'Rétro, grain, cel', cat: 'Classiques',
+      prompt: '90s anime style, cel shading, retro grain, dramatic eyes, nostalgia aesthetic. Transform the entire image into this 90s anime style.' },
+    { id: 'south-park', name: 'South Park', emoji: '❄️', desc: 'Simple, découpé', cat: 'Classiques',
+      prompt: 'South Park cutout animation style, simple geometric shapes, flat colors, paper cutout aesthetic. Transform the entire image into this South Park style.' },
+    { id: 'rick-morty', name: 'Rick & Morty', emoji: '🧪', desc: 'Scientifique, déjanté', cat: 'Classiques',
+      prompt: 'Rick and Morty animation style, wobbly line art, big pupils, flat colors, sci-fi absurd atmosphere. Transform the entire image into this Rick and Morty style.' },
+    { id: 'lego', name: 'Lego', emoji: '🧱', desc: 'Briques, plastique', cat: 'Classiques',
+      prompt: 'Lego minifigure style, plastic brick texture, C-shaped hands, studs visible, toy photography lighting. Transform the entire image into this Lego style.' },
+    { id: 'claymation', name: 'Claymation', emoji: '🎭', desc: 'Pâte à modeler', cat: 'Classiques',
+      prompt: 'claymation stop-motion animation, plasticine texture, fingerprint details, Aardman Studios style, warm studio lighting. Transform the entire image into this claymation style.' },
+    { id: 'chibi', name: 'Chibi', emoji: '🐣', desc: 'Petit, mignon, kawaii', cat: 'Classiques',
+      prompt: 'chibi anime style, tiny body, oversized head, big sparkling eyes, kawaii aesthetic, soft pastel colors. Transform the entire image into this chibi style.' },
+    { id: 'manga-nb', name: 'Manga N&B', emoji: '🖤', desc: 'Encre, trames, contraste', cat: 'Classiques',
+      prompt: 'black and white Japanese manga style, stark ink outlines, dramatic screentones, speed lines, high contrast. Transform the entire image into this manga style.' },
+    { id: 'bd-franco', name: 'BD franco-belge', emoji: '📘', desc: 'Ligne claire, Tintin', cat: 'Classiques',
+      prompt: 'Franco-Belgian bande dessinée style, ligne claire technique, uniform clean ink outlines, flat vivid colors. Transform the entire image into this comic book style.' },
+
+    // ── ARTISTIQUES ──
+    { id: 'aquarelle', name: 'Aquarelle', emoji: '🎨', desc: 'Couleurs qui coulent', cat: 'Artistiques',
+      prompt: 'dreamy watercolor painting aesthetic, soft bleeding edges, translucent washes, visible paper texture, gentle color gradients. Transform the entire image into this watercolor style.' },
+    { id: 'papercut', name: 'Papercut', emoji: '✂️', desc: 'Papier découpé, ombres', cat: 'Artistiques',
+      prompt: 'paper cutout art style, layered paper depth, soft drop shadows, craft aesthetic, textured paper. Transform the entire image into this papercut style.' },
+    { id: 'pixel-art', name: 'Pixel Art', emoji: '👾', desc: '8/16 bits, rétro gaming', cat: 'Artistiques',
+      prompt: '8-bit / 16-bit pixel art style, visible pixels, limited color palette, retro video game aesthetic, sprite-based. Transform the entire image into this pixel art style.' },
+    { id: 'low-poly', name: 'Low Poly', emoji: '🔺', desc: 'Géométrique, facettes', cat: 'Artistiques',
+      prompt: 'low poly 3D style, visible triangular facets, flat shading per polygon, minimalist geometric aesthetic. Transform the entire image into this low poly style.' },
+    { id: 'vaporwave', name: 'Vaporwave', emoji: '🌴', desc: 'Années 90, néons', cat: 'Artistiques',
+      prompt: 'vaporwave aesthetic, nostalgic 90s imagery, pastel gradients, neon pink and cyan, VHS quality, retro-futuristic. Transform the entire image into this vaporwave style.' },
+    { id: 'oil-painting', name: 'Peinture à l\'huile', emoji: '🖼️', desc: 'Pinceaux visibles', cat: 'Artistiques',
+      prompt: 'classical oil painting style, visible impasto brushstrokes, rich textured paint, old master technique. Transform the entire image into this oil painting style.' },
+    { id: 'graffiti', name: 'Graffiti', emoji: '🎤', desc: 'Street art, spray', cat: 'Artistiques',
+      prompt: 'street art graffiti style, spray paint texture, bold outlines, urban aesthetic, vivid colors. Transform the entire image into this graffiti style.' },
+    { id: 'pop-art', name: 'Pop Art', emoji: '💥', desc: 'Warhol, couleurs vives', cat: 'Artistiques',
+      prompt: 'pop art style, Andy Warhol influence, bold flat colors, comic book dots, repetition. Transform the entire image into this pop art style.' }
+];
+
+// ══════════════════════════════════════════════════════════════════
+// ÉTAT
+// ══════════════════════════════════════════════════════════════════
+const state = {
+    images: [],
+    isRunning: false,
+    stopRequested: false,
+    queue: [],
+    completed: 0,
+    failed: 0,
+    selectedStyle: null,
+    mainPrompt: '',
+    intensity: 'moderate',
+    motion: 'moderate',
+    durationFrames: 153,
+    isLoadingImages: false,
+    creationAttemptsSinceLastError: 0
+};
+
+// ══════════════════════════════════════════════════════════════════
+// TOAST
+// ══════════════════════════════════════════════════════════════════
+let toastTimeout = null;
+function showToast(message, type = 'success', duration = 2500) {
+    const toast = document.getElementById('toast');
+    const icon = document.getElementById('toast-icon');
+    const text = document.getElementById('toast-text');
+    toast.classList.remove('visible', 'success', 'error', 'warn');
+    void toast.offsetWidth;
+    const icons = { success: '✓', error: '✕', warn: '⚠' };
+    icon.textContent = icons[type] || '✓';
+    text.textContent = message;
+    toast.classList.add(type);
+    requestAnimationFrame(() => toast.classList.add('visible'));
+    if (toastTimeout) clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => toast.classList.remove('visible'), duration);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ANTI-VEILLE
+// ══════════════════════════════════════════════════════════════════
+let wakeLockSentinel = null;
+let wakeLockEnabled = false;
+let canvasStream = null;
+let canvasInterval = null;
+
+async function activateWakeLock() {
+    let success = false;
+    if ('wakeLock' in navigator) {
+        try {
+            wakeLockSentinel = await navigator.wakeLock.request('screen');
+            success = true;
+        } catch (e) { console.warn('WakeLock refusé:', e.message); }
+    }
+    if (!success) {
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 2; canvas.height = 2;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 2, 2);
+            canvasStream = canvas.captureStream(1);
+            let toggle = false;
+            canvasInterval = setInterval(() => {
+                toggle = !toggle;
+                ctx.fillStyle = toggle ? '#000' : '#010101';
+                ctx.fillRect(0, 0, 2, 2);
+            }, 1000);
+            const video = document.createElement('video');
+            video.srcObject = canvasStream;
+            video.muted = true;
+            video.playsInline = true;
+            await video.play().catch(() => {});
+            success = true;
+        } catch (e) { console.warn('Canvas fallback échoué:', e.message); }
+    }
+    return success;
+}
+
+async function deactivateWakeLock() {
+    if (wakeLockSentinel) {
+        try { await wakeLockSentinel.release(); } catch (e) {}
+        wakeLockSentinel = null;
+    }
+    if (canvasInterval) { clearInterval(canvasInterval); canvasInterval = null; }
+    if (canvasStream) {
+        try { canvasStream.getTracks().forEach(t => t.stop()); } catch (e) {}
+        canvasStream = null;
+    }
+}
+
+function updateWakeStatus() {
+    const el = document.getElementById('wake-status');
+    const txt = document.getElementById('wake-status-text');
+    const btn = document.getElementById('wake-toggle-btn');
+    el.classList.remove('active');
+    const isActive = wakeLockSentinel !== null || canvasStream !== null;
+    if (wakeLockEnabled && isActive) {
+        el.classList.add('active');
+        txt.textContent = '✅ Écran allumé';
+        btn.textContent = 'Désactiver';
+    } else {
+        txt.textContent = '💤 Veille automatique';
+        btn.textContent = 'Garder l\'écran allumé';
+    }
+}
+
+async function toggleWakeLock() {
+    if (wakeLockEnabled) {
+        wakeLockEnabled = false;
+        await deactivateWakeLock();
+        try { localStorage.setItem(WAKE_LOCK_PREF, '0'); } catch (e) {}
+        showToast('Veille automatique réactivée', 'warn');
+    } else {
+        wakeLockEnabled = true;
+        await activateWakeLock();
+        try { localStorage.setItem(WAKE_LOCK_PREF, '1'); } catch (e) {}
+        showToast('Écran maintenu allumé', 'success');
+    }
+    updateWakeStatus();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CACHE TEMPS
+// ══════════════════════════════════════════════════════════════════
+function loadTimingCache() {
+    try { return JSON.parse(localStorage.getItem(TIMING_CACHE_KEY) || '{}'); }
+    catch (e) { return {}; }
+}
+function recordGenerationTime(numFrames, durationMs) {
+    const cache = loadTimingCache();
+    const key = String(numFrames);
+    if (!cache[key]) cache[key] = [];
+    cache[key].push(durationMs);
+    if (cache[key].length > 10) cache[key] = cache[key].slice(-10);
+    try { localStorage.setItem(TIMING_CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
+    updateTimingDisplay();
+}
+function estimateGenerationTime(numFrames) {
+    const cache = loadTimingCache();
+    const samples = cache[String(numFrames)];
+    if (samples && samples.length > 0) {
+        const sorted = [...samples].sort((a, b) => a - b);
+        return sorted[Math.floor(sorted.length / 2)];
+    }
+    return 30000 + numFrames * 500;
+}
+function updateTimingDisplay() {
+    const cache = loadTimingCache();
+    const all = Object.values(cache).flat();
+    const speedEl = document.getElementById('stat-speed');
+    const samplesEl = document.getElementById('stat-samples');
+    if (all.length === 0) {
+        speedEl.textContent = 'en attente';
+        samplesEl.textContent = '0 génération';
+        return;
+    }
+    const avg = all.reduce((a, b) => a + b, 0) / all.length;
+    speedEl.textContent = (avg / 1000).toFixed(1) + 's en moyenne';
+    samplesEl.textContent = all.length + ' génération' + (all.length > 1 ? 's' : '');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CLÉ API
+// ══════════════════════════════════════════════════════════════════
+function getApiKey() {
+    try { return (localStorage.getItem(API_KEY_STORAGE) || '').trim(); }
+    catch (e) { return ''; }
+}
+
+function saveApiKey() {
+    const input = document.getElementById('api-key-input');
+    const key = input.value.trim();
+    if (!key) {
+        try { localStorage.removeItem(API_KEY_STORAGE); } catch (e) {}
+        updateApiPanel();
+        showToast('Clé supprimée', 'warn');
+        return;
+    }
+    if (!key.startsWith('sk-')) {
+        if (!confirm('La clé ne commence pas par "sk-". La sauvegarder quand même ?')) return;
+    }
+    try {
+        localStorage.setItem(API_KEY_STORAGE, key);
+        updateApiPanel();
+        showToast('Clé API enregistrée ✓', 'success');
+    } catch (e) {
+        showToast('Erreur sauvegarde', 'error');
+    }
+}
+
+function updateApiPanel() {
+    const panel = document.getElementById('api-panel');
+    const input = document.getElementById('api-key-input');
+    const statusLine = document.getElementById('api-status-line');
+    const statusText = document.getElementById('api-status-text');
+    const key = getApiKey();
+    if (key) {
+        panel.classList.add('ok');
+        statusLine.classList.add('ok');
+        statusText.textContent = 'Clé active · ' + key.slice(0, 8) + '…' + key.slice(-4);
+        input.value = key;
+    } else {
+        panel.classList.remove('ok');
+        statusLine.classList.remove('ok');
+        statusText.textContent = 'Aucune clé API enregistrée';
+        input.value = '';
+    }
+    updateGenerateBtn();
+}
+
+function updateGenerateBtn() {
+    const btn = document.getElementById('generate-btn');
+    const hasImages = state.images.length > 0;
+    const hasKey = !!getApiKey();
+    const hasStyle = !!state.selectedStyle;
+    btn.disabled = !hasImages || !hasKey || !hasStyle || state.isRunning || state.isLoadingImages;
+
+    if (state.isLoadingImages) btn.textContent = 'Chargement… (' + state.images.length + ')';
+    else if (state.isRunning) btn.textContent = 'Création… (' + (state.completed + state.failed) + '/' + state.queue.length + ')';
+    else if (!hasKey) btn.textContent = 'Ajoutez votre clé API';
+    else if (!hasImages) btn.textContent = 'Ajoutez des images';
+    else if (!hasStyle) btn.textContent = 'Choisissez un style cartoon';
+    else btn.textContent = 'Créer ' + state.images.length + ' cartoon' + (state.images.length > 1 ? 's' : '');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// UTILITAIRES
+// ══════════════════════════════════════════════════════════════════
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function log(msg) { console.log('[Cartoon] ' + msg); }
+function setStatus(text) {
+    const bar = document.getElementById('status-bar');
+    const txt = document.getElementById('status-text');
+    if (text) { bar.classList.add('visible'); txt.textContent = text; }
+    else bar.classList.remove('visible');
+}
+function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+}
+function formatEta(seconds) {
+    if (seconds < 60) return Math.round(seconds) + 's';
+    return Math.floor(seconds / 60) + 'm' + (Math.round(seconds % 60) > 0 ? ' ' + Math.round(seconds % 60) + 's' : '');
+}
+function randomItem(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+// ══════════════════════════════════════════════════════════════════
+// IMAGES
+// ══════════════════════════════════════════════════════════════════
+function fileToDataUri(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = () => reject(new Error('Erreur lecture'));
+        reader.readAsDataURL(file);
+    });
+}
+
+function generateThumbnail(dataUri) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                const ratio = img.height / img.width;
+                canvas.width = THUMBNAIL_MAX_WIDTH;
+                canvas.height = Math.round(THUMBNAIL_MAX_WIDTH * ratio);
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                resolve(canvas.toDataURL('image/jpeg', 0.7));
+            } catch (e) { resolve(dataUri); }
+        };
+        img.onerror = () => resolve(dataUri);
+        img.src = dataUri;
+    });
+}
+
+async function processOneFile(file) {
+    if (!file.type.startsWith('image/')) return null;
+    if (file.size > MAX_IMAGE_SIZE) return null;
+    try {
+        const dataUri = await fileToDataUri(file);
+        const thumbnail = await generateThumbnail(dataUri);
+        return { file, dataUri, thumbnail, id: Date.now() + Math.random() };
+    } catch (e) { return null; }
+}
+
+async function handleFiles(files) {
+    const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (!imageFiles.length) return;
+
+    state.isLoadingImages = true;
+    updateGenerateBtn();
+    setStatus('Chargement de ' + imageFiles.length + ' image(s)…');
+
+    const BATCH = 5;
+    let processed = 0;
+    for (let i = 0; i < imageFiles.length; i += BATCH) {
+        const batch = imageFiles.slice(i, i + BATCH);
+        const results = await Promise.allSettled(batch.map(f => processOneFile(f)));
+        for (const r of results) {
+            if (r.status === 'fulfilled' && r.value) {
+                state.images.push(r.value);
+                processed++;
+            }
+        }
+        renderImages();
+        setStatus('Chargement… ' + processed + '/' + imageFiles.length);
+    }
+
+    state.isLoadingImages = false;
+    setStatus(null);
+    updateGenerateBtn();
+}
+
+function removeImage(id) {
+    state.images = state.images.filter(img => img.id !== id);
+    renderImages();
+    updateGenerateBtn();
+}
+
+function renderImages() {
+    const grid = document.getElementById('images-grid');
+    grid.innerHTML = state.images.map(img =>
+        '<div class="image-card">' +
+            '<img src="' + (img.thumbnail || img.dataUri) + '" alt="">' +
+            '<button class="remove-btn" data-remove="' + img.id + '">✕</button>' +
+        '</div>'
+    ).join('');
+
+    grid.querySelectorAll('[data-remove]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            removeImage(parseFloat(btn.dataset.remove));
+        });
+    });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// RENDU DES STYLES
+// ══════════════════════════════════════════════════════════════════
+function renderStyles() {
+    const container = document.getElementById('styles-grid');
+    const categories = [...new Set(CARTOON_STYLES.map(s => s.cat))];
+    let html = '';
+
+    categories.forEach(cat => {
+        html += '<div class="style-category-header">' + esc(cat) + '</div>';
+        html += CARTOON_STYLES.filter(s => s.cat === cat).map(s =>
+            '<div class="style-card ' + (state.selectedStyle === s.id ? 'selected' : '') + '" data-style="' + s.id + '">' +
+                '<div class="style-emoji">' + s.emoji + '</div>' +
+                '<div>' +
+                    '<div class="style-name">' + esc(s.name) + '</div>' +
+                    '<div class="style-desc">' + esc(s.desc) + '</div>' +
+                '</div>' +
+            '</div>'
+        ).join('');
+    });
+
+    container.innerHTML = html;
+
+    container.querySelectorAll('[data-style]').forEach(el => {
+        el.addEventListener('click', () => {
+            state.selectedStyle = el.dataset.style;
+            renderStyles();
+            updateGenerateBtn();
+        });
+    });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CONSTRUCTION DU PROMPT
+// ══════════════════════════════════════════════════════════════════
+const INTENSITY_PROMPTS = {
+    subtle: 'Apply the cartoon style lightly, keeping recognisable resemblance to the original photo. Soft transition, subtle stylization.',
+    moderate: 'Apply the cartoon style clearly and confidently, balanced stylization. The subject is clearly cartoon but still recognizable.',
+    radical: 'Apply the cartoon style radically and completely. Full transformation, total stylization, ignore photographic realism.'
+};
+
+const MOTION_PROMPTS = {
+    subtle: 'very subtle movement, gentle and quiet animation',
+    moderate: 'moderate movement, clear but controlled animation',
+    strong: 'strong exaggerated cartoon animation, bouncy energetic movement, squash and stretch'
+};
+
+const CARTOON_ACTIONS = [
+    'the character blinks and smiles slightly at the camera',
+    'the character\'s hair bounces gently with cartoon physics',
+    'the character raises an eyebrow and grins',
+    'the character waves a hand in a friendly cartoon gesture',
+    'the character\'s eyes sparkle and widen in surprise',
+    'the character tilts their head with curiosity',
+    'the character laughs with exaggerated cartoon expression',
+    'the character breathes with a slight bouncy rhythm'
+];
+
+function buildPrompt() {
+    const style = CARTOON_STYLES.find(s => s.id === state.selectedStyle);
+    const parts = [];
+
+    parts.push('Animate this image as a cartoon. Transform it into an animated cartoon scene.');
+    if (style) parts.push(style.prompt);
+    parts.push(INTENSITY_PROMPTS[state.intensity] || INTENSITY_PROMPTS.moderate);
+    parts.push(MOTION_PROMPTS[state.motion] || MOTION_PROMPTS.moderate);
+
+    if (state.mainPrompt && state.mainPrompt.trim()) {
+        parts.push('Additional artistic direction: ' + state.mainPrompt.trim());
+    }
+
+    parts.push(randomItem(CARTOON_ACTIONS));
+    parts.push('Sound design: minimal cartoon foley, soft ambient, no music, no dialogue');
+    parts.push('Portrait orientation 9:16 vertical, 24fps, no text, no subtitles, no watermarks');
+
+    return parts.join('. ');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// API
+// ══════════════════════════════════════════════════════════════════
+async function apiFetch(url, options = {}, label = 'API') {
+    for (let attempt = 0; attempt < 7; attempt++) {
+        if (state.stopRequested) throw new Error('Arrêt demandé');
+        try {
+            const res = await fetch(url, options);
+            if (res.status === 429) {
+                if (createIntervalMs < CREATE_INTERVAL_SAFE) {
+                    createIntervalMs = Math.min(createIntervalMs + 8000, CREATE_INTERVAL_MAX);
+                }
+                const wait = [15, 30, 45, 60, 90, 120, 180][Math.min(attempt, 6)];
+                setStatus('L\'IA se prépare… (' + wait + 's)');
+                await sleep(wait * 1000);
+                continue;
+            }
+            if (res.status === 503) {
+                const wait = [5, 10, 15, 20, 30, 45][Math.min(attempt, 5)];
+                setStatus('Préparation… (' + wait + 's)');
+                await sleep(wait * 1000);
+                continue;
+            }
+            if (res.ok && createIntervalMs > CREATE_INTERVAL_MIN) {
+                state.creationAttemptsSinceLastError++;
+                if (state.creationAttemptsSinceLastError >= 3) {
+                    createIntervalMs = Math.max(createIntervalMs - 4000, CREATE_INTERVAL_MIN);
+                    state.creationAttemptsSinceLastError = 0;
+                }
+            }
+            return res;
+        } catch (e) {
+            if (e.message === 'Arrêt demandé') throw e;
+            const wait = [3, 5, 8, 12, 20, 30][Math.min(attempt, 5)];
+            setStatus('Connexion… (' + wait + 's)');
+            await sleep(wait * 1000);
+        }
+    }
+    return fetch(url, options);
+}
+
+async function createVideoTask(imageDataUri, prompt) {
+    const body = {
+        model: MODEL_VIDEO,
+        prompt: prompt,
+        image: imageDataUri,
+        num_frames: state.durationFrames,
+        frame_rate: FRAME_RATE
+    };
+
+    const res = await apiFetch(API_BASE + '/videos', {
+        method: 'POST',
+        headers: {
+            'Authorization': 'Bearer ' + getApiKey(),
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+    }, 'Création');
+
+    if (!res.ok) {
+        const err = await res.text();
+        throw new Error('HTTP ' + res.status + ' — ' + err.slice(0, 200));
+    }
+
+    const data = await res.json();
+    const videoId = data.video_id || data.id || data.task_id;
+    if (!videoId) throw new Error('Pas de video_id retourné');
+    return videoId;
+}
+
+async function pollVideo(videoId, onProgress) {
+    const estimatedSec = estimateGenerationTime(state.durationFrames) / 1000;
+    let remaining = Math.max(20, Math.floor(estimatedSec * 0.8));
+    while (remaining > 0) {
+        if (state.stopRequested) throw new Error('Arrêt demandé');
+        onProgress('Préparation… — ' + remaining + 's');
+        await sleep(1000);
+        remaining--;
+    }
+
+    for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+        if (state.stopRequested) throw new Error('Arrêt demandé');
+        if (attempt > 0) {
+            let r = POLL_INTERVAL_SEC;
+            while (r > 0) {
+                if (state.stopRequested) throw new Error('Arrêt demandé');
+                onProgress('L\'image s\'anime… — ' + r + 's');
+                await sleep(1000);
+                r--;
+            }
+        }
+
+        const url = POLL_BASE + '?video_id=' + encodeURIComponent(videoId) + '&model_name=' + encodeURIComponent(MODEL_VIDEO);
+        const res = await apiFetch(url, {
+            method: 'GET',
+            headers: { 'Authorization': 'Bearer ' + getApiKey() }
+        }, 'Polling');
+
+        const d = await res.json();
+        const status = d.status || 'unknown';
+        const progress = d.progress || 0;
+        onProgress('Création… — ' + progress + '%');
+
+        if (status === 'completed' || status === 'succeeded' || status === 'done') {
+            const videoUrl = (d.metadata && d.metadata.url) || d.url || (d.output && d.output.url);
+            if (!videoUrl) throw new Error('Terminé mais pas d\'URL');
+            return videoUrl;
+        }
+        if (status === 'failed' || status === 'error' || status === 'cancelled') {
+            throw new Error('Échec (' + status + ')');
+        }
+    }
+    throw new Error('Délai maximal dépassé');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// FILE D'ATTENTE
+// ══════════════════════════════════════════════════════════════════
+function renderQueue() {
+    const queueEl = document.getElementById('queue');
+    if (!state.queue.length) { queueEl.style.display = 'none'; return; }
+    queueEl.style.display = 'block';
+
+    const total = state.queue.length;
+    const done = state.completed + state.failed;
+    const inProgress = state.queue.filter(q => q.status === 'processing').length;
+    const pending = total - done - inProgress;
+
+    let html = '<div class="queue-summary">' +
+        '<span class="progress-text">Progression : ' + done + '/' + total + '</span>' +
+        '<span>' + (pending > 0 ? pending + ' en attente' : inProgress > 0 ? inProgress + ' en cours' : 'Terminé') + '</span>' +
+        '</div>';
+
+    const visible = state.queue.slice(0, MAX_VISIBLE_QUEUE);
+    html += visible.map(item => {
+        let icon = '○', statusText = 'En attente', cls = 'pending';
+        if (item.status === 'creating') { icon = '◐'; statusText = 'Préparation…'; cls = 'creating'; }
+        else if (item.status === 'processing') { icon = '◐'; statusText = item.progress || 'En cours'; cls = 'processing'; }
+        else if (item.status === 'done') { icon = '●'; statusText = 'Terminé'; cls = 'done'; }
+        else if (item.status === 'failed') { icon = '✕'; statusText = 'Échec'; cls = 'failed'; }
+
+        return '<div class="queue-item ' + cls + '">' +
+            '<div class="q-icon">' + icon + '</div>' +
+            '<div class="q-name">Image ' + (item.imageIndex + 1) + '</div>' +
+            '<div class="q-status">' + esc(statusText) + '</div>' +
+        '</div>';
+    }).join('');
+
+    queueEl.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// GALERIE
+// ══════════════════════════════════════════════════════════════════
+function addToGallery(videoUrl, label) {
+    const galleryEl = document.getElementById('gallery');
+    const galleryGrid = document.getElementById('gallery-grid');
+    galleryEl.style.display = 'block';
+    const el = document.createElement('div');
+    el.className = 'gallery-item';
+    el.innerHTML = '<video controls preload="metadata" muted playsinline>' +
+        '<source src="' + videoUrl + '" type="video/mp4">' +
+        '</video>' +
+        '<div class="g-caption">' + esc(label) + '</div>';
+    galleryGrid.appendChild(el);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PIPELINE
+// ══════════════════════════════════════════════════════════════════
+async function createTaskOnly(item) {
+    item.status = 'creating';
+    item.progress = 'Préparation…';
+    renderQueue();
+
+    const prompt = buildPrompt();
+    item.prompt = prompt;
+
+    log('[Image ' + (item.imageIndex + 1) + '] Création…');
+    const videoId = await createVideoTask(item.image.dataUri, prompt);
+    item.videoId = videoId;
+    item.startTime = Date.now();
+    item.status = 'processing';
+    item.progress = 'En cours…';
+    renderQueue();
+    return videoId;
+}
+
+async function pollTaskAndDisplay(item) {
+    try {
+        const videoUrl = await pollVideo(item.videoId, (prog) => {
+            item.progress = prog;
+            renderQueue();
+        });
+
+        const elapsed = Date.now() - item.startTime;
+        recordGenerationTime(state.durationFrames, elapsed);
+        log('[Image ' + (item.imageIndex + 1) + '] Terminée en ' + (elapsed / 1000).toFixed(1) + 's');
+
+        item.status = 'done';
+        item.videoUrl = videoUrl;
+        state.completed++;
+        renderQueue();
+        updateGenerateBtn();
+        addToGallery(videoUrl, 'Image ' + (item.imageIndex + 1));
+    } catch (e) {
+        if (e.message === 'Arrêt demandé') {
+            item.status = 'failed';
+            item.progress = 'Arrêté';
+        } else {
+            log('[Image ' + (item.imageIndex + 1) + '] ' + e.message);
+            item.status = 'failed';
+            item.progress = 'Échec';
+            state.failed++;
+        }
+        renderQueue();
+        updateGenerateBtn();
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// WORKFLOW PRINCIPAL
+// ══════════════════════════════════════════════════════════════════
+async function startGeneration() {
+    if (state.isRunning || !state.images.length) return;
+    if (!getApiKey()) { showToast('Ajoutez votre clé API', 'error'); return; }
+    if (!state.selectedStyle) { showToast('Choisissez un style cartoon', 'error'); return; }
+
+    state.mainPrompt = document.getElementById('main-prompt').value.trim();
+
+    state.isRunning = true;
+    state.stopRequested = false;
+    state.completed = 0;
+    state.failed = 0;
+    state.creationAttemptsSinceLastError = 0;
+    createIntervalMs = CREATE_INTERVAL_MIN;
+
+    state.queue = state.images.map((img, i) => ({
+        imageIndex: i,
+        image: img,
+        status: 'pending',
+        progress: null,
+        videoId: null,
+        videoUrl: null,
+        prompt: null,
+        startTime: null
+    }));
+
+    document.getElementById('gallery-grid').innerHTML = '';
+    document.getElementById('gallery').style.display = 'none';
+    document.getElementById('stop-btn').classList.add('visible');
+    updateGenerateBtn();
+
+    if (wakeLockEnabled) await activateWakeLock();
+    renderQueue();
+
+    const totalStart = Date.now();
+    const pollingTasks = [];
+
+    try {
+        for (let i = 0; i < state.queue.length; i++) {
+            if (state.stopRequested) break;
+            const item = state.queue[i];
+            try {
+                await createTaskOnly(item);
+                pollingTasks.push(pollTaskAndDisplay(item));
+            } catch (e) {
+                if (e.message === 'Arrêt demandé') break;
+                log('[Image ' + (i + 1) + '] Échec création : ' + e.message);
+                item.status = 'failed';
+                item.progress = 'Échec';
+                state.failed++;
+                renderQueue();
+                updateGenerateBtn();
+            }
+
+            if (i < state.queue.length - 1 && !state.stopRequested) {
+                const waitSec = Math.ceil(createIntervalMs / 1000);
+                for (let r = waitSec; r > 0; r--) {
+                    if (state.stopRequested) break;
+                    setStatus('Pause créative… — Image ' + (i + 2) + '/' + state.queue.length + ' dans ' + r + 's');
+                    await sleep(1000);
+                }
+            }
+        }
+
+        if (pollingTasks.length > 0) {
+            setStatus('Finalisation…');
+            await Promise.allSettled(pollingTasks);
+        }
+    } catch (e) {
+        log('Erreur globale : ' + e.message);
+    }
+
+    const totalElapsed = (Date.now() - totalStart) / 1000;
+    const summary = state.stopRequested
+        ? 'Arrêté — ' + state.completed + '/' + state.queue.length + ' vidéos'
+        : '✦ ' + state.completed + '/' + state.queue.length + ' cartoons créés en ' + formatEta(totalElapsed) + ' ✦';
+
+    log(summary);
+    setStatus(summary);
+    await sleep(4000);
+    setStatus(null);
+
+    state.isRunning = false;
+    state.stopRequested = false;
+    document.getElementById('stop-btn').classList.remove('visible');
+    updateGenerateBtn();
+    showToast(state.completed + ' cartoon' + (state.completed > 1 ? 's' : '') + ' créé' + (state.completed > 1 ? 's' : ''), 'success');
+}
+
+function stopGeneration() {
+    if (!state.isRunning) return;
+    state.stopRequested = true;
+    log('Arrêt demandé');
+    setStatus('Arrêt en cours…');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// INITIALISATION
+// ══════════════════════════════════════════════════════════════════
+(function init() {
+    document.getElementById('api-save-btn').addEventListener('click', saveApiKey);
+    document.getElementById('stop-btn').addEventListener('click', stopGeneration);
+
+    const apiInput = document.getElementById('api-key-input');
+    apiInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); saveApiKey(); }
+    });
+
+    document.querySelectorAll('[data-toggle]').forEach(header => {
+        header.addEventListener('click', () => {
+            document.getElementById(header.dataset.toggle).classList.toggle('open');
+        });
+    });
+
+    const uploadZone = document.getElementById('upload-zone');
+    const fileInput = document.getElementById('file-input');
+    uploadZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', e => {
+        handleFiles(e.target.files);
+        fileInput.value = '';
+    });
+
+    document.getElementById('main-prompt').addEventListener('input', e => {
+        state.mainPrompt = e.target.value;
+    });
+
+    document.getElementById('duration-select').addEventListener('change', e => {
+        state.durationFrames = parseInt(e.target.value, 10);
+    });
+    document.getElementById('intensity-select').addEventListener('change', e => {
+        state.intensity = e.target.value;
+    });
+    document.getElementById('motion-select').addEventListener('change', e => {
+        state.motion = e.target.value;
+    });
+
+    document.getElementById('generate-btn').addEventListener('click', startGeneration);
+    document.getElementById('wake-toggle-btn').addEventListener('click', toggleWakeLock);
+
+    try {
+        wakeLockEnabled = localStorage.getItem(WAKE_LOCK_PREF) === '1';
+    } catch (e) {}
+
+    updateApiPanel();
+    updateTimingDisplay();
+    updateWakeStatus();
+    renderStyles();
+    renderImages();
+    renderQueue();
+
+    log('Prêt.');
+})();
+</script>
+
+</body>
+</html>
